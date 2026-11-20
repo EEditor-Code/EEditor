@@ -193,7 +193,7 @@ cmake --build build
 
 ### 许可
 
-本仓库代码以 **GNU Lesser General Public License v2.1 or later**（LGPL-2.1-or-later）发布，版权归 **北京格瑞特皮软件科技有限公司** 所有。允许闭源软件以动态链接（DLL）方式使用本库；对库本身的修改需继续以 LGPL 发布。详见 `LICENSE`、`COPYING`、`COPYING.LESSER` 与 `NOTICE`。
+本仓库代码以 **GNU Lesser General Public License v2.1 or later**（LGPL-2.1-or-later）发布，版权归 **nwpu052009** `<ljwangcumtb@163.com>` 所有。允许闭源软件以动态链接（DLL）方式使用本库；对库本身的修改需继续以 LGPL 发布。详见 `LICENSE`、`COPYING`、`COPYING.LESSER` 与 `NOTICE`。
 
 ---
 
@@ -381,4 +381,4 @@ The introduction, design philosophy, four-layer architecture and examples in thi
 
 ### License
 
-This repository is released under the **GNU Lesser General Public License v2.1 or later** (LGPL-2.1-or-later). Copyright (C) 2026 **Beijing Great Pi Software Technology Co., Ltd.** Proprietary software may use this library via dynamic linking (DLL); modifications to the library itself must remain under the LGPL. See `LICENSE`, `COPYING`, `COPYING.LESSER` and `NOTICE`.
+This repository is released under the **GNU Lesser General Public License v2.1 or later** (LGPL-2.1-or-later). Copyright (C) 2026 **nwpu052009** `<ljwangcumtb@163.com>`. Proprietary software may use this library via dynamic linking (DLL); modifications to the library itself must remain under the LGPL. See `LICENSE`, `COPYING`, `COPYING.LESSER` and `NOTICE`.

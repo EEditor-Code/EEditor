@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LGPL-2.1-or-later
-// Copyright (C) 2026 北京格瑞特皮软件科技有限公司
+// Copyright (C) 2026 nwpu052009 <ljwangcumtb@163.com>
 
 #include "EVariant.h"
 #include "EMatrix4x4.h"
