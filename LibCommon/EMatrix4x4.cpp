@@ -86,7 +86,7 @@ void EMatrix4x4::makeScale(double x, double y, double z)
 
 void EMatrix4x4::makeScale(const EVec3& scale)
 {
-    this->makeTranslate(scale.x, scale.y, scale.z);
+    this->makeScale(scale.x, scale.y, scale.z);
 }
 
 void EMatrix4x4::makeRotate( double angle, double x, double y, double z )

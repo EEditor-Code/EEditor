@@ -66,7 +66,7 @@ struct COMMON_DLL EItemMetaProperty : public Referenced
     Fun_setProperty m_funSetProperty = NULL;
     Fun_getProperty m_funGetProperty = NULL;
 
-    intptr_t m_owner;
+    intptr_t m_owner = 0;
 
     long getTag();
 

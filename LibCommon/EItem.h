@@ -26,6 +26,9 @@ public:
     EItem();
     virtual ~EItem();
 
+    EItem(const EItem&) = delete;
+    EItem& operator=(const EItem&) = delete;
+
     void setName(const char* strName);
     void setName(const EString& strName);
     EString getName();
@@ -202,6 +205,7 @@ protected:
 
 private:
     // 数据层纯插入/移除(无通知)
+    bool isAncestorOf(const EItem* node) const;
     bool d_addChild(EItem* child);
     bool d_insertChild(int index, EItem* child);
     /**纯挂载(不检查 model 归属, 供 model 内部 move 复用已挂载 item)*/

@@ -39,6 +39,9 @@ public:
     EItemMetaFunction();
     virtual ~EItemMetaFunction();
 
+    EItemMetaFunction(const EItemMetaFunction&) = delete;
+    EItemMetaFunction& operator=(const EItemMetaFunction&) = delete;
+
     void addProperty(const EItemMetaPropertyPtr& p);
     EItemMetaPropertyPtr getProperty(int index);
     size_t getPropertyCount();
@@ -81,7 +84,7 @@ public:
 
 
     /**if FunType==CLASS_MEMBER, this m_owner is the object pointer*/
-    FunType m_funType;
+    FunType m_funType = FREE;
     EString m_name;
     EString nameCN;///< 中文显示名(头文件注释 \nameCN; 空 = 显示回退 i18n 表/代码名)
     EString m_groupName;

@@ -3,6 +3,7 @@
 
 #include "EString.h"
 #include "DefineCommon.h"
+#include <cctype>
 #include <cstdio>
 
 #ifdef WIN32
@@ -10,6 +11,60 @@
 #else
 #include <string/pystring.h>
 #endif
+
+namespace
+{
+bool isSafeDoubleFormat(const char* fmt)
+{
+    if (fmt == nullptr || *fmt == '\0')
+    {
+        return false;
+    }
+
+    int conversions = 0;
+    for (const char* p = fmt; *p != '\0'; ++p)
+    {
+        if (*p != '%')
+        {
+            continue;
+        }
+
+        ++p;
+        if (*p == '%')
+        {
+            continue;
+        }
+
+        while (*p == '-' || *p == '+' || *p == ' ' || *p == '#' || *p == '0')
+        {
+            ++p;
+        }
+        while (std::isdigit(static_cast<unsigned char>(*p)))
+        {
+            ++p;
+        }
+        if (*p == '.')
+        {
+            ++p;
+            while (std::isdigit(static_cast<unsigned char>(*p)))
+            {
+                ++p;
+            }
+        }
+        if (*p == 'l')
+        {
+            ++p;
+        }
+        if (*p != 'f' && *p != 'F' && *p != 'e' && *p != 'E' &&
+            *p != 'g' && *p != 'G' && *p != 'a' && *p != 'A')
+        {
+            return false;
+        }
+        ++conversions;
+    }
+    return conversions == 1;
+}
+}
 
 namespace EStringUtil
 {
@@ -26,6 +81,11 @@ EString subStr(const EString& s, size_t posBegin, size_t len)
 
 void remove(EString& s, const EString& subStr)
 {
+    if (subStr.empty())
+    {
+        return;
+    }
+
     size_t lenOld = subStr.size();
     size_t posFindBegin = 0;
 
@@ -58,8 +118,13 @@ EStringList split(const EString& s, const EString& sep)
 
 EString number(double value, const char* formatStr)
 {
+    const char* fmt = isSafeDoubleFormat(formatStr) ? formatStr : "%f";
     char data[64];
-    sprintf(data, formatStr, value);
+    int written = std::snprintf(data, sizeof(data), fmt, value);
+    if (written < 0)
+    {
+        return EString();
+    }
     return EString(data);
 }
 

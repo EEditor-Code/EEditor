@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <iterator>
 #include <functional>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -113,13 +114,60 @@ bool EItem::addChild(EItem* childItem)
     return d_addChild(childItem);
 }
 
+bool EItem::isAncestorOf(const EItem* node) const
+{
+    if (node == nullptr)
+    {
+        return false;
+    }
+    std::vector<const EItem*> stack;
+    std::unordered_set<const EItem*> visited;
+    stack.push_back(node);
+    while (!stack.empty())
+    {
+        const EItem* current = stack.back();
+        stack.pop_back();
+        if (!visited.insert(current).second)
+        {
+            continue;
+        }
+        for (EItem* parent : current->m_itemListParent)
+        {
+            if (parent == this)
+            {
+                return true;
+            }
+            if (parent != nullptr)
+            {
+                stack.push_back(parent);
+            }
+        }
+    }
+    return false;
+}
+
 bool EItem::d_addChild(EItem* child)
 {
     if (child == nullptr)
     {
         return false;
     }
-    // 防护: 已属某 model 的 item 不能被游离节点挂载(一个 item 至多属于一个 model)
+    if (child == this || child->isAncestorOf(this))
+    {
+        ELOG_ERROR("EItem: cannot insert an ancestor (or self) as a child");
+        return false;
+    }
+    if (this->containsChild(child))
+    {
+        ELOG_ERROR("EItem: cannot add an ancestor (or self) as a child");
+        return false;
+    }
+    if (this->containsChild(child))
+    {
+        ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\",ignoring call",
+                child->getName().data(), this->getName().data());
+        return false;
+    }
     m_itemListChild.push_back(child);
     child->m_itemListParent.push_back(this);
     return true;
@@ -136,6 +184,11 @@ bool EItem::d_insertChild(int index, EItem* child)
 {
     if (child == nullptr)
     {
+        return false;
+    }
+    if (child == this || child->isAncestorOf(this))
+    {
+        ELOG_ERROR("EItem: cannot insert an ancestor (or self) as a child");
         return false;
     }
     if (this->containsChild(child))
@@ -336,14 +389,19 @@ bool EItem::d_removeChild(int index, int numChildrenToRemove)
 
 bool EItem::removeParent(int index, int numParentToRemove)
 {
-    bool result = false;
-    if(index >= 0 || index < m_itemListParent.size())
+    if (index < 0 || numParentToRemove <= 0 ||
+        index >= static_cast<int>(m_itemListParent.size()))
     {
-        int endOfRemoveRange = index+numParentToRemove;
-        m_itemListParent.erase(m_itemListParent.begin()+index, m_itemListParent.begin()+endOfRemoveRange);
-        result = true;
+        return false;
     }
-    return result;
+    int endOfRemoveRange = index + numParentToRemove;
+    if (endOfRemoveRange > static_cast<int>(m_itemListParent.size()))
+    {
+        endOfRemoveRange = static_cast<int>(m_itemListParent.size());
+    }
+    m_itemListParent.erase(m_itemListParent.begin() + index,
+                           m_itemListParent.begin() + endOfRemoveRange);
+    return true;
 }
 
 bool EItem::removeChild(EItem* childPtr)

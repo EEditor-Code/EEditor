@@ -6,5 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(EE_BUILD_SHARED "Build LibCommon as a shared library" ON)
+option(EE_BUILD_TESTS "Build unit tests" ON)
 
 add_subdirectory(LibCommon)
+
+if(EE_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

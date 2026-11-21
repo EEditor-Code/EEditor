@@ -26,6 +26,9 @@ public:
     EItemMeta();
     virtual ~EItemMeta();
 
+    EItemMeta(const EItemMeta&) = delete;
+    EItemMeta& operator=(const EItemMeta&) = delete;
+
     EString getClassName();
     void setClassName(const EString& className);
 
