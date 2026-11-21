@@ -186,7 +186,7 @@ template <typename T>
 template <typename Derived>
 ESmartPtr<Derived> ESmartPtr<T>::dynamicCast(const ESmartPtr& base) {
     Derived* derived = dynamic_cast<Derived*>(base.get());
-    return ESmartPtr<Derived>(derived, false); // Use private constructor, do not increase reference count
+    return ESmartPtr<Derived>(derived, true); // Share ownership: add a reference
 }
 
 template <typename T>
