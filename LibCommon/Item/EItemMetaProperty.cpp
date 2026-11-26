@@ -2,7 +2,7 @@
 // Copyright (C) 2026 nwpu052009 <ljwangcumtb@163.com>
 
 #include "EItemMetaProperty.h"
-#include <EItem.h>
+#include <Item/EItem.h>
 
 namespace
 {

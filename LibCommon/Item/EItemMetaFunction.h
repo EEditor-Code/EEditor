@@ -6,13 +6,13 @@
 
 #include <cstdint>
 #include <stdarg.h>
-#include "EString.h"
+#include <Variant/EString.h>
 #include "SmartPtr/ESmartPtr.h"
 // #include <functional>
 #include <DefineLibCommon.h>
 #include <DefineCommon.h>
-#include <EItemMetaProperty.h>
-#include <EVariant.h>
+#include <Item/EItemMetaProperty.h>
+#include <Variant/EVariant.h>
 /*This delegate code is not used in final version, but the delegate.h file is still in this project*/
 // #include <delegate/delegate.h>
 

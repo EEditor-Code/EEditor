@@ -5,9 +5,11 @@
 #define E_VARIANT_H
 
 #include <DefineLibCommon.h>
-#include <EMatrix4x4.h>
-#include <EVec2.h>
-#include <EString.h>
+#include "EMatrix4x4.h"
+#include "EVec2.h"
+#include "EVec3.h"
+#include "EVec4.h"
+#include "EString.h"
 #include <SmartPtr/ESmartPtr.h>
 #include <cstdint>
 #include <vector>

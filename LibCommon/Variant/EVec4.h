@@ -5,7 +5,7 @@
 #define E_VEC_4_H
 
 #include <DefineLibCommon.h>
-#include <EVec3.h>
+#include "EVec3.h"
 
 /*A vector that has 4 values, you can use this struct as Quat or color.*/
 struct  COMMON_DLL EVec4 {

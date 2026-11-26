@@ -141,13 +141,17 @@ EEditor-open/
 ├─ docs/images/                # README 配图
 └─ LibCommon/                  # 最小内核层（C++17，无 Qt/OSG 依赖）
    ├─ CMakeLists.txt
-   ├─ EItem.*                  # 对象树基类
-   ├─ EItemMeta.*              # 类元信息（属性/方法）
-   ├─ EItemMetaProperty.*      # 属性元信息
-   ├─ EItemMetaFunction.*      # 函数元信息
-   ├─ EVariant.*               # 通用属性值
-   ├─ EString.*                # 字符串别名与工具
-   ├─ EVec2/3/4.* EMatrix4x4.* # 基础数学类型
+   ├─ DefineCommon.h           # 公共宏与依赖聚合
+   ├─ DefineLibCommon.h        # 导出宏
+   ├─ Item/                    # 对象模型与元信息
+   │  ├─ EItem.*               # 对象树基类
+   │  ├─ EItemMeta.*           # 类元信息（属性/方法）
+   │  ├─ EItemMetaProperty.*   # 属性元信息
+   │  └─ EItemMetaFunction.*   # 函数元信息
+   ├─ Variant/                 # 值类型层
+   │  ├─ EVariant.*            # 通用属性值
+   │  ├─ EString.h EStringUtil.cpp  # 字符串别名与工具
+   │  └─ EVec2/3/4.* EMatrix4x4.*   # 基础数学类型
    ├─ SmartPtr/                # 引用计数智能指针
    ├─ string/                  # pystring 工具
    └─ log/                     # 日志
@@ -329,13 +333,17 @@ EEditor-open/
 ├─ docs/images/                # README images
 └─ LibCommon/                  # minimal kernel (C++17, no Qt/OSG dependency)
    ├─ CMakeLists.txt
-   ├─ EItem.*                  # object-tree base class
-   ├─ EItemMeta.*              # class metadata (properties/functions)
-   ├─ EItemMetaProperty.*      # property metadata
-   ├─ EItemMetaFunction.*      # function metadata
-   ├─ EVariant.*               # generic property value
-   ├─ EString.*                # string alias and utilities
-   ├─ EVec2/3/4.* EMatrix4x4.* # basic math types
+   ├─ DefineCommon.h           # shared macros and dependency aggregation
+   ├─ DefineLibCommon.h        # export macros
+   ├─ Item/                    # object model and metadata
+   │  ├─ EItem.*               # object-tree base class
+   │  ├─ EItemMeta.*           # class metadata (properties/functions)
+   │  ├─ EItemMetaProperty.*   # property metadata
+   │  └─ EItemMetaFunction.*   # function metadata
+   ├─ Variant/                 # value types
+   │  ├─ EVariant.*            # generic property value
+   │  ├─ EString.h EStringUtil.cpp  # string alias and utilities
+   │  └─ EVec2/3/4.* EMatrix4x4.*   # basic math types
    ├─ SmartPtr/                # reference-counted smart pointer
    ├─ string/                  # pystring utilities
    └─ log/                     # logging

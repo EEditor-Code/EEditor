@@ -9,7 +9,7 @@
 #include <DefineCommon.h>
 #include <cstddef>
 #include <cstdint>
-#include <EItemMeta.h>
+#include <Item/EItemMeta.h>
 
 /**The base class that stores all useful information for ui.
  * All other extended functions should inherit this class and build a wrap class type.

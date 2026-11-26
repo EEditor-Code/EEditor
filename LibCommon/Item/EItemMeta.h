@@ -4,13 +4,13 @@
 #ifndef E_ITEM_META_H
 #define E_ITEM_META_H
 
-#include "EString.h"
+#include <Variant/EString.h>
 #include "SmartPtr/ESmartPtr.h"
 #include <DefineLibCommon.h>
 #include <DefineCommon.h>
 
-#include <EItemMetaProperty.h>
-#include <EItemMetaFunction.h>
+#include <Item/EItemMetaProperty.h>
+#include <Item/EItemMetaFunction.h>
 
 struct EItemMetaData;
 class EItemMeta;

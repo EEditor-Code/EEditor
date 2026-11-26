@@ -1,12 +1,12 @@
 #include <cstdio>
 #include <type_traits>
 
-#include <EItem.h>
-#include <EItemMeta.h>
-#include <EItemMetaFunction.h>
-#include <EItemMetaProperty.h>
-#include <EMatrix4x4.h>
-#include <EString.h>
+#include <Item/EItem.h>
+#include <Item/EItemMeta.h>
+#include <Item/EItemMetaFunction.h>
+#include <Item/EItemMetaProperty.h>
+#include <Variant/EMatrix4x4.h>
+#include <Variant/EString.h>
 #include <SmartPtr/ESmartPtr.h>
 
 namespace

@@ -52,8 +52,8 @@
     #include <list>
     #include <vector>
     #include <map>
-    #include <EVariant.h>
-    #include <EString.h>
+    #include <Variant/EVariant.h>
+    #include <Variant/EString.h>
 
     // #define EString std::string
     #define EList std::vector
