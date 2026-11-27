@@ -6,11 +6,12 @@
 
 #include <cstdint>
 #include <stdarg.h>
+#include <vector>
 #include <Variant/EString.h>
 #include "SmartPtr/ESmartPtr.h"
 // #include <functional>
 #include <DefineLibCommon.h>
-#include <DefineCommon.h>
+#include <ECommonDefines.h>
 #include <Item/EItemMetaProperty.h>
 #include <Variant/EVariant.h>
 /*This delegate code is not used in final version, but the delegate.h file is still in this project*/
@@ -67,7 +68,7 @@ public:
     void setReturnProperty(const EItemMetaPropertyPtr& p);
     EItemMetaPropertyPtr getReturnProperty();
 
-    void call( EVariant* result, EList<EVariant*> vList);
+    void call( EVariant* result, std::vector<EVariant*> vList);
     void call( EVariant* result);
     void call( EVariant* result, EVariant* v1);
     void call( EVariant* result, EVariant* v1, EVariant* v2);

@@ -4,189 +4,137 @@
 #ifndef E_ITEM_H
 #define E_ITEM_H
 
-#include "SmartPtr/ESmartPtr.h"
+#include <SmartPtr/ESmartPtr.h>
 #include <DefineLibCommon.h>
-#include <DefineCommon.h>
+#include <ECommonDefines.h>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 #include <Item/EItemMeta.h>
 
-/**The base class that stores all useful information for ui.
- * All other extended functions should inherit this class and build a wrap class type.
- * */
+/**对象树基类: 保存名称、类型、父子关系与元信息, 是树/属性/序列化等功能的共同数据基础。
+ * 扩展功能通过继承本类并组合包装类实现, 不应直接修改本类。*/
 class EItem;
+/**EItem 的引用计数智能指针。*/
 typedef ESmartPtr<EItem> EItemPtr;
+/**EItemPtr 列表(子项列表等容器使用)。*/
 typedef std::vector<EItemPtr> EItemList;
+/**创建 EItemMeta 的回调: 由派生类或使用方通过 setFunCreateMeta 注册。*/
 typedef EItemMetaPtr (*Fun_createMeta)(EItem*);
 
 // class COMMON_DLL EItem : public std::enable_shared_from_this<EItem>
 class COMMON_DLL EItem : public Referenced
 {
 public:
+    /**构造一个空项: 无名称、无父、无子、无 meta。*/
     EItem();
+    /**虚析构: 保证经基类指针销毁派生项时能正确析构。*/
     virtual ~EItem();
 
+    /**禁止拷贝构造: 项由智能指针管理, 不支持值语义复制。*/
     EItem(const EItem&) = delete;
+    /**禁止拷贝赋值。*/
     EItem& operator=(const EItem&) = delete;
 
+    /**设置项名称(C 字符串重载)。*/
     void setName(const char* strName);
+    /**设置项名称(EString 重载)。*/
     void setName(const EString& strName);
+    /**获取项名称(见 m_name)。*/
     EString getName();
 
+    /**获取类型名(由具体类在构造时写入, 外部不可修改)。*/
     EString getType();
 
-    /*A int tag value for item manager in outside program. This value is just the conversion of this pointer to int*/
-    long getTag();
-
+    /**获取项 ID(见 m_id): 本项的唯一身份标识, 构造时自动分配, 生命周期内保持不变。
+     *  外部(UI/RPC/管理器)引用一律使用 id, 不要依赖对象地址; 0 表示无效。*/
     int getId() const { return m_id; }
 
+    /**设置项的文本描述(纯内部文本, 不参与 UI 显示与序列化)。*/
+    void setDescription(const char* strName);
+    /**获取项的文本描述。*/
+    EString getDescription();
+
+    /****添加相关函数******/
+    /**添加子项(唯一公开入口): 校验空指针、自引用、重复挂载与父子环。
+     *  所有权: 成功后父项持有 childItem 的一个强引用; 对象须由 ESmartPtr 管理，
+     *  调用方不得再手动 delete(传栈对象/成员对象会在析构时 delete 非堆内存)。*/
+    bool addChild(const EItemPtr& childItem);
+
+    /**在指定位置插入子项: 新子项插入到原 index 位置节点之前; 越界时追加/钳制到首尾。
+     *  所有权与 addChild 相同: 成功后父项持有 childItem 的一个强引用。*/
+    bool insertChild(int index, const EItemPtr& childItem);
+
+    /****移除相关函数******/
+    /**按索引移除子项, 可一次移除连续 numChildrenToRemove 个; 成功返回 true。*/
+    bool removeChild(int index, int numChildrenToRemove=1);
+    /**removeChild 的智能指针重载: 按指针查索引后走索引版本。*/
+    bool removeChild( const EItemPtr& childItem );
+
+    /**移除全部子项(同时解除各子项对本项的父引用); 无子项时返回 false。*/
+    bool removeChildrenAll();
+
+    /****查找相关函数******/
+    /**按索引获取直接子项(返回强引用, 持有期间子项不会被释放); 越界返回空 EItemPtr。*/
+    EItemPtr getChild(int index);
+
+    /**获取直接子项数量。*/
+    size_t getChildCount();
+
+    /**按智能指针获取子项索引; 未找到返回 -1。*/
+    int getChildIndex(const EItemPtr& childItem);
+
+    /**按索引获取父项(多父结构; 返回借用指针, 仅在父子关系存在时有效, 不要长期保存); 越界返回 nullptr。*/
+    EItem* getParent(int index);
+
+    /**获取父项数量(多父结构)。*/
+    size_t getParentCount();
+
+    /**按智能指针获取父项索引; 未找到返回 -1。*/
+    int getParentIndex(const EItemPtr& parentItem);
+
+    /**判断本项是否为 childItem 的父级(祖先): 沿 childItem 的父链向上查找, 不限于直接父项。*/
+    bool isParentOf(const EItemPtr& childItem) const;
+    /**判断本项是否为 parentItem 的子级(后代): 沿本项父链向上查找。*/
+    bool isChildOf(const EItemPtr& parentItem) const;
+
+    /**挂接一个外部对象指针(如 UI 树项缓存); 仅保存指针, 不管理其生命周期。*/
+    virtual void setAttached(intptr_t ptr);
+    /**返回先前挂接的外部对象指针; 未挂接时为 0。*/
+    virtual intptr_t getAttached();
+
+    /**获取本项的 meta(返回强引用); 尚未创建时用 m_fun_createMeta 懒创建(无回调则创建默认 EItemMeta)。*/
+    virtual EItemMetaPtr getOrCreatMeta();
+
+    /**直接获取 meta(可能为 nullptr, 不会触发创建)。*/
+    EItemMetaPtr getMeta() const;
+    /**直接设置 meta。*/
+    void setMeta(EItemMetaPtr meta);
+
+    /**设置创建 meta 的回调(由派生类或使用方注册)。*/
+    void setFunCreateMeta(Fun_createMeta fun);
+
+    /**返回调试字符串: 名称、类型、子项数量、父项数量。*/
+    virtual EString getStrForDebug();
+
+protected:
     /*!
-        \brief 唯一 ID，由 EItemManager 自动分配。
-        \~english Unique identifier, auto-assigned by EItemManager.
+        \brief 唯一 ID，构造时自动分配，对象生命周期内保持不变。
+        \~english Unique identifier, assigned automatically at construction and stable for the object's lifetime.
         \nameCN ID
         \editable false
     */
     int m_id = 0;
 
-    void setIfShownInUI(bool boolValue);
-    bool getIfShownInUI();
-
-    /**UI 可删性: false ⇒ 经 UI 的删除入口(工具栏/右键菜单/RPC 的 delete_items)跳过本项。
-     *  ★ 刻意**只约束"经 UI 的删除"**, 不是不变量 —— 内部代码仍可直接 removeChild
-     *    (与"子项白名单"同样的定位: 界面约束而非强制, 见 ESensorRoot.h 的同类说明)。
-     *    判定点: EUITree::uiDeleteItems / uiDeleteSubTreeItems 的过滤步骤
-     *    —— 必须在建 ECommand 快照**之前**, 否则撤销会把本项复活。*/
-    void setUIDeletable(bool boolValue);
-    bool isUIDeletable() const;
-
-    void setDescription(const char* strName);
-    EString getDescription();
-
-    /****Adding releated functions******/
-    /**add child to this*/
-    virtual bool addChild(EItem* childItem);
-    bool addChild(const EItemPtr& childItem) { return addChild(childItem.get()); }
-
-    /** Insert child at specific location.
-     * The new child is inserted into the child list
-     * before the node at the specified index.
-     */
-    virtual bool insertChild(int index, EItem* child );
-    bool insertChild(int index, const EItemPtr& childItem) { return insertChild(index, childItem.get()); }
-
-    /**临时挂载(序列化收集等临时容器用): 纯挂载, 不检查 model 归属、不改变 m_model。
-     * 调用方必须保证不破坏 model 语义(如仅用于 ECommand 序列化收集)。*/
-    bool attachChild(EItem* child);
-    bool attachChild(const EItemPtr& childItem) { return attachChild(childItem.get()); }
-
-    /****Finding releated functions******/
-    /**get child item from this*/
-    virtual EItem* getChild(int index);
-    /**get child item from this by type name*/
-    virtual EItem* getChildByTypeName(const EString& typeName);
-
-    virtual EItem* getParent(int index);
-
-    /**get child item index by ptr, return -1 if not found*/
-    virtual int getChildIndex(EItem* childItem);
-    int getChildIndex(const EItemPtr& childItem) { return getChildIndex(childItem.get()); }
-
-    /**get parent item index by ptr, return -1 if not found*/
-    virtual int getParentIndex(EItem* parentItem);
-    int getParentIndex(const EItemPtr& parentItem) { return getParentIndex(parentItem.get()); }
-
-    virtual size_t getParentCount();
-
-    /**get children count*/
-    size_t getChildCount();
-    /** Return true if child is contained within. */
-    bool containsChild( const EItem* child );
-    template<class T> bool containsChild( const ESmartPtr<T>& child ) { return containsChild(child.get()); }
-
-    /****removing releated functions******/
-    /**remove a child by index*/
-    virtual bool removeChild(int index, int numChildrenToRemove=1);
-    /**remove a child by ptr*/
-    virtual bool removeChild(EItem* childItem);
-    template<class T> bool removeChild( const ESmartPtr<T>& childItem ) { return removeChild(childItem.get()); }
-
-    /**remove a child by index*/
-    virtual bool removeParent(int index, int numParentToRemove=1);
-
-    /**remove a parent by ptr*/
-    virtual bool removeParent(EItem* parentItem);
-    template<class T> bool removeParent( const ESmartPtr<T>& parentItem ) { return removeParent(parentItem.get()); }
-
-    /**remove all children*/
-    virtual bool removeChildrenAll();
-
-    //Enable to attach some outer object for convenient
-    virtual void setAttached(intptr_t ptr);
-    virtual intptr_t getAttached();
-
-    /****Changing releated functions******/
-    //convenient function for setting property's ifShowUI
-    void setPropertyIfShowUI(const EString& propName , bool value);
-    /**隐藏/恢复某声明类的属性组(组名 = autogen 写入的 groupName, 即声明类名)。
-     * 对本项及其子树生效: EUIProperty 会沿当前项父链查询。仅影响属性面板显示。*/
-    void setPropertyGroupVisible(const EString& groupName, bool visible)
-    {
-        this->getOrCreatMeta()->setPropertyGroupVisible(groupName, visible);
-    }
-    //convenient function for setting property's ifSyncUIEveryFrame
-    void setPropertyIfSyncUIEveryFrame(const EString& propName, bool value); 
-    //convenient function for setting item's icon name
-    void setPropertyIconName(const EString& iconName);
-    EString getPropertyIconName();
-    // virtual bool changeParent(EItem* parentNew, EItem* parentOld);
-    // virtual void selectThis();
-
-    void setIfHandledInTree(bool value);
-    bool getIfHandledInTree();
-
-    /* ==== 树结构访问 ==== */
-    /**第一个父节点(多父保留; 无父返回 nullptr)*/
-    EItem* parent() const;
-    /**在第一个父中的行号(无父返回 -1)*/
-    int row() const;
-
-    virtual EItemMeta* getOrCreatMeta();
-
-    // Get/Set item meta directly
-    EItemMetaPtr getMeta() const;
-    void setMeta(EItemMetaPtr meta);
-
-    //called by autogen.h
-    void setFunCreateMeta(Fun_createMeta fun);
-
-    virtual EString getStrForDebug();
-
-    /* ==== 仿真生命周期钩子(默认不参与; 子类按需 override) ====
-     * 约定:
-     *  - 参与者必须同时 override 钩子与 isSimulationParticipant();
-     *  - onSimulationStart 保存原始状态(快照), onSimulationStop 用快照恢复;
-     *  - 恢复请经属性通道写回(vsg/属性面板同步); 管理器在仿真期间已全局抑制 undo,
-     *    参与者不要再自行 beginSuppressUndo/endSuppressUndo;
-     *  - 主线程调用。*/
-    /**是否参与仿真(参与者计数、仿真期可编辑项判据)。默认 false。*/
-    virtual bool isSimulationParticipant() const;
-    /**仿真开始: 保存原始状态(快照)。默认空实现。*/
-    virtual void onSimulationStart();
-    /**仿真暂停/恢复: 可选钩子。默认空实现。*/
-    virtual void onSimulationPause();
-    virtual void onSimulationResume();
-    /**仿真结束: 用开始时的快照恢复原始状态。默认空实现。*/
-    virtual void onSimulationStop();
-
-protected:
-    // Item meta (moved from EItemData to direct member)
+    /**本项的元信息(属性/函数描述); 由 getOrCreatMeta() 惰性创建。*/
     EItemMetaPtr m_itemMeta;
 
-    // child and parent lists
-    EList<EItem*> m_itemListParent;
-    EList<EItemPtr> m_itemListChild;
+    /**父项列表(多父结构; 顺序即父链顺序)。*/
+    std::vector<EItem*> m_itemListParent;
+    /**子项列表(顺序即树中的显示顺序)。*/
+    std::vector<EItemPtr> m_itemListChild;
 
-    // Function for EItemMeta generation
+    /**创建 meta 的回调(经 setFunCreateMeta 注册)。*/
     Fun_createMeta m_fun_createMeta = nullptr;
 
     /*!
@@ -204,32 +152,14 @@ protected:
     EString m_type;
 
 private:
-    // 数据层纯插入/移除(无通知)
-    bool isAncestorOf(const EItem* node) const;
-    bool d_addChild(EItem* child);
-    bool d_insertChild(int index, EItem* child);
-    /**纯挂载(不检查 model 归属, 供 model 内部 move 复用已挂载 item)*/
-    bool d_attachChild(int index, EItem* child);
-    bool d_removeChild(int index, int numChildrenToRemove = 1);
-    void d_clearChildren();
-
-    /* ==== 以下五个成员刻意放 private ====
-     * ExeReflection 只收集非 private 的 m_ 成员(AutogenCodeGenerator.cpp:203-207),
-     * 故 private 天然不被注册成属性 —— 它们都是内部状态, 出现在属性面板里可编辑是 footgun:
-     *   m_attached        被误改会破坏 EUITreeQt 的树项缓存;
-     *   m_ifHandledInTree 被误改会让增量建树错乱(该显的不显、该重的不重);
-     *   m_ifShownInUI     无写入方, 恒为 true;
-     *   m_uiDeletable     被误改只是让某个节点能/不能被 UI 删掉, 影响面小但同样不该出现在面板上;
-     *   m_description     纯内部文本(2026-10-14 由 protected 移入), 不应出现在属性面板。
+    /* ==== 以下两个成员刻意放 private ====
+     * 它们是内部状态, 不应参与反射/属性面板(完整平台的反射只收集非 private 成员):
+     *   m_attached    外部挂载指针, 供 UI 树项缓存使用;
+     *   m_description 项的纯内部文本描述。
      * 对外读写一律经 public 访问器:
-     *   setIfShownInUI/getIfShownInUI、setIfHandledInTree/getIfHandledInTree、
-     *   setAttached/getAttached、setUIDeletable/isUIDeletable、
-     *   setDescription/getDescription。*/
-    bool m_ifShownInUI = true;          // 是否在 UI 中显示(默认 true)
-    bool m_ifHandledInTree = false;     // 树结构是否已处理(避免重复遍历)
-    bool m_uiDeletable = true;          // 是否允许经 UI 删除(默认 true = 现状不变)
-    intptr_t m_attached = NULL;         // 外部挂载指针(如 EUITreeQt 的 QTreeItemExtended*)
-    EString m_description;              // 项的文本描述(经 setDescription/getDescription 读写)
+     *   setAttached/getAttached、setDescription/getDescription。*/
+    intptr_t m_attached = 0;            ///< 外部挂载指针(如 UI 树项缓存)
+    EString m_description;              ///< 项的文本描述(经 setDescription/getDescription 读写)
 
 };
 

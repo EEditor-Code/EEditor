@@ -2,7 +2,7 @@
 // Copyright (C) 2026 nwpu052009 <ljwangcumtb@163.com>
 
 #include "EString.h"
-#include "DefineCommon.h"
+#include "ECommonDefines.h"
 #include <cctype>
 #include <cstdio>
 

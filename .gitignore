@@ -7,3 +7,4 @@ dist/
 *.suo
 CMakeUserPresets.json
 compile_commands.json
+.cache/

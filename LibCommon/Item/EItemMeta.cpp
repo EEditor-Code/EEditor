@@ -3,7 +3,9 @@
 
 #include "EItemMeta.h"
 #include "EItemMetaFunction.h"
+#include <map>
 #include <set>
+#include <vector>
 
 /** EVariant::EVariantType → 类型名(下标必须与 EVariant.h 的枚举顺序**逐一对应**)。
  *  ⚠️ 此表曾停留在旧枚举(缺 VEC2/VARIANT/列表/FILE_INFO), 从 VEC2 起全部错位且越界;
@@ -32,10 +34,10 @@ static_assert(sizeof(EItemMeta_typeStrArray) / sizeof(EItemMeta_typeStrArray[0])
 
 struct EItemMetaData
 {
-    EList<EItemMetaPropertyPtr> m_propertys;
-    EMap<EString, size_t> m_mapPropFastIndex;
-    EList<EItemMetaFunctionPtr> m_functions;
-    EMap<EString, size_t> m_mapFunFastIndex;
+    std::vector<EItemMetaPropertyPtr> m_propertys;
+    std::map<EString, size_t> m_mapPropFastIndex;
+    std::vector<EItemMetaFunctionPtr> m_functions;
+    std::map<EString, size_t> m_mapFunFastIndex;
     ///< 成员注册序号计数器:addFunction/addProperty 时全局递增,
     ///< 父类成员(基类构造时)先注册,故注册序天然反映"父类在前"
     int m_regOrderCounter = 0;

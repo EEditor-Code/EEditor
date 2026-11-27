@@ -13,17 +13,18 @@ Referenced& Referenced::operator=(const Referenced&) {
 }
 
 void Referenced::ref() const {
-    ++_refCount;
+    _refCount.fetch_add(1, std::memory_order_relaxed);
 }
 
 void Referenced::unref() const {
-    if (--_refCount == 0) {
+    // acq_rel: 最后一个引用释放前的写操作对析构线程可见
+    if (_refCount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
         delete this;
     }
 }
 
 int Referenced::getRefCount() const {
-    return _refCount;
+    return _refCount.load(std::memory_order_relaxed);
 }
 
 Referenced::~Referenced() = default;

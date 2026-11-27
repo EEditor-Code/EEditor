@@ -1,4 +1,12 @@
-add_executable(ee_tests tests.cpp)
+add_executable(ee_tests
+    tests_main.cpp
+    test_smart_ptr.cpp
+    test_eitem_tree.cpp
+    test_parent_destruction.cpp
+    test_remove_range.cpp
+    test_matrix_scale.cpp
+    test_string_util.cpp
+    test_default_init.cpp)
 target_link_libraries(ee_tests PRIVATE LibCommon)
 target_include_directories(ee_tests PRIVATE "${PROJECT_SOURCE_DIR}/LibCommon")
 

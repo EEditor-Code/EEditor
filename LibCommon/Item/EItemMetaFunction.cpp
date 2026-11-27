@@ -2,14 +2,14 @@
 // Copyright (C) 2026 nwpu052009 <ljwangcumtb@163.com>
 
 #include "EItemMetaFunction.h"
-#include "DefineCommon.h"
+#include "ECommonDefines.h"
 #include "EItemMetaProperty.h"
 #include <cstdint>
 
 struct EItemMetaFunctionData
 {
     EItemMetaPropertyPtr m_valueReturn;
-    EList<EItemMetaPropertyPtr> m_propertys;
+    std::vector<EItemMetaPropertyPtr> m_propertys;
     intptr_t m_owner;
 };
 
@@ -120,7 +120,7 @@ EItemMetaPropertyPtr EItemMetaFunction::getReturnProperty()
     return this->m_data->m_valueReturn;
 }
 
-void EItemMetaFunction::call(EVariant* result, EList<EVariant*> vList)
+void EItemMetaFunction::call(EVariant* result, std::vector<EVariant*> vList)
 {
     if(vList.size() == 0)
     {

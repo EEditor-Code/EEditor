@@ -2,14 +2,12 @@
 // Copyright (C) 2026 nwpu052009 <ljwangcumtb@163.com>
 
 #include "EItem.h"
-#include "DefineCommon.h"
+#include "ECommonDefines.h"
 #include "EItemMeta.h"
-#include "EItemMetaProperty.h"
+#include <algorithm>
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
-#include <iterator>
-#include <functional>
 #include <unordered_set>
 #include <vector>
 
@@ -21,34 +19,24 @@ std::atomic<int> g_nextItemId{1};
 EItem::EItem()
 {
     m_id = g_nextItemId.fetch_add(1);
-    m_attached = NULL;
 }
 
 EItem::~EItem()
 {
+    // 断开子项回指本项的裸指针，避免父项先析构后子项持有悬空父指针。
+    // 注意：这里不能调 removeChild（会触发 unref 重入释放），
+    // 只做列表清理，子项强引用由 m_itemListChild 析构时统一释放。
+    for (const EItemPtr& child : m_itemListChild)
+    {
+        if (!child)
+        {
+            continue;
+        }
+        std::vector<EItem*>& parents = child->m_itemListParent;
+        parents.erase(std::remove(parents.begin(), parents.end(), this), parents.end());
+    }
 }
 
-bool EItem::isSimulationParticipant() const
-{
-    return false;
-}
-
-void EItem::onSimulationStart()
-{
-}
-
-void EItem::onSimulationPause()
-{
-}
-
-void EItem::onSimulationResume()
-{
-}
-
-void EItem::onSimulationStop()
-{
-}
-    
 void EItem::setName(const char* strName)
 {
     m_name = strName;
@@ -69,31 +57,6 @@ EString EItem::getType()
     return m_type;
 }
 
-long EItem::getTag()
-{
-    return (long)this;
-}
-
-void EItem::setIfShownInUI(bool boolValue)
-{
-    this->m_ifShownInUI = boolValue;
-}
-
-bool EItem::getIfShownInUI()
-{
-    return this->m_ifShownInUI;
-}
-
-void EItem::setUIDeletable(bool boolValue)
-{
-    this->m_uiDeletable = boolValue;
-}
-
-bool EItem::isUIDeletable() const
-{
-    return this->m_uiDeletable;
-}
-
 void EItem::setDescription(const char* strName)
 {
     this->m_description = strName;
@@ -104,18 +67,207 @@ EString EItem::getDescription()
     return this->m_description;
 }
 
-bool EItem::addChild(EItem* childItem)
+bool EItem::addChild(const EItemPtr& childItemRef)
 {
+    EItem* childItem = childItemRef.get();
     if (childItem == nullptr)
     {
         return false;
     }
-    // 已挂 model: 走 model 通道(重复/循环校验 + begin/end 通知 + model 传播)
-    return d_addChild(childItem);
+    // 防环: 本项不能是 childItem 的后代(否则挂接后形成父子环)。
+    if (childItem == this || isChildOf(childItemRef))
+    {
+        ELOG_ERROR("EItem: cannot add an ancestor (or self) as a child");
+        return false;
+    }
+
+    // 重复挂载检查: 直接扫描子项列表, 不再走额外函数。
+    for (const EItemPtr& child : m_itemListChild)
+    {
+        if (child.get() == childItem)
+        {
+            ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\", ignoring call",
+                    childItem->getName().data(), this->getName().data());
+            return false;
+        }
+    }
+
+    m_itemListChild.push_back(childItem);
+    try
+    {
+        childItem->m_itemListParent.push_back(this);
+    }
+    catch (...)
+    {
+        // 第二次 push 失败：回滚父项侧的强引用，保持双向关系一致
+        m_itemListChild.pop_back();
+        throw;
+    }
+    return true;
 }
 
-bool EItem::isAncestorOf(const EItem* node) const
+bool EItem::insertChild(int index, const EItemPtr& childItemRef)
 {
+    EItem* child = childItemRef.get();
+    if (child == nullptr)
+    {
+        return false;
+    }
+    if (child == this || isChildOf(childItemRef))
+    {
+        ELOG_ERROR("EItem: cannot insert an ancestor (or self) as a child");
+        return false;
+    }
+    // 重复挂载检查: 直接扫描子项列表
+    for (const EItemPtr& existing : m_itemListChild)
+    {
+        if (existing.get() == child)
+        {
+            ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\", ignoring call",
+                    child->getName().data(), this->getName().data());
+            return false;
+        }
+    }
+
+    EItemList& _children = m_itemListChild;
+    const int size = static_cast<int>(_children.size());
+    int insertIndex = index;
+    if (insertIndex < 0)
+    {
+        insertIndex = 0;
+    }
+    else if (insertIndex > size)
+    {
+        insertIndex = size;
+    }
+
+    _children.insert(_children.begin() + insertIndex, child);
+    try
+    {
+        child->m_itemListParent.push_back(this);
+    }
+    catch (...)
+    {
+        // 第二次插入失败：回滚子项列表，保持双向关系一致
+        _children.erase(_children.begin() + insertIndex);
+        throw;
+    }
+    return true;
+}
+
+bool EItem::removeChild(int index, int numChildrenToRemove)
+{
+    const int childCount = static_cast<int>(m_itemListChild.size());
+    if (index < 0 || numChildrenToRemove <= 0 || index >= childCount)
+    {
+        return false;
+    }
+    // 先与剩余数量比较，避免 index + numChildrenToRemove 的有符号溢出
+    const int remaining = childCount - index;
+    const int count = (numChildrenToRemove > remaining) ? remaining : numChildrenToRemove;
+    const int endOfRemoveRange = index + count;
+
+    // 解除子项回指本项的父指针(同类可直接访问私有成员)
+    for(int i = index; i < endOfRemoveRange; i++)
+    {
+        EItem* child = m_itemListChild[i].get();
+        if (child == nullptr)
+        {
+            continue;
+        }
+        std::vector<EItem*>& parents = child->m_itemListParent;
+        parents.erase(std::remove(parents.begin(), parents.end(), this), parents.end());
+    }
+
+    m_itemListChild.erase(m_itemListChild.begin()+index, m_itemListChild.begin()+endOfRemoveRange);
+    return true;
+}
+
+bool EItem::removeChild(const EItemPtr& childItem)
+{
+    const int index = getChildIndex(childItem);
+    return index >= 0 && removeChild(index, 1);
+}
+
+bool EItem::removeChildrenAll()
+{
+    if (m_itemListChild.empty())
+    {
+        return false;
+    }
+    // 先解除各子项回指本项的父指针，再清空列表
+    // (clear 释放强引用，子项无其他引用时随之析构)
+    for (size_t i = 0; i < m_itemListChild.size(); ++i)
+    {
+        EItem* child = m_itemListChild[i].get();
+        if (child == nullptr)
+        {
+            continue;
+        }
+        std::vector<EItem*>& parents = child->m_itemListParent;
+        parents.erase(std::remove(parents.begin(), parents.end(), this), parents.end());
+    }
+    m_itemListChild.clear();
+    return true;
+}
+
+EItemPtr EItem::getChild(int index)
+{
+    if (index >= 0 && index < static_cast<int>(m_itemListChild.size()))
+    {
+        return m_itemListChild[index];
+    }
+    return EItemPtr();
+}
+
+size_t EItem::getChildCount()
+{
+    return m_itemListChild.size();
+}
+
+int EItem::getChildIndex(const EItemPtr& childItem)
+{
+    const EItem* target = childItem.get();
+    for (size_t i = 0; i < m_itemListChild.size(); ++i)
+    {
+        if (m_itemListChild[i].get() == target)
+        {
+            return static_cast<int>(i);
+        }
+    }
+    return -1; // node not found.
+}
+
+EItem* EItem::getParent(int index)
+{
+    if (index >= 0 && index < static_cast<int>(m_itemListParent.size()))
+    {
+        return m_itemListParent[index];
+    }
+    return nullptr;
+}
+
+size_t EItem::getParentCount()
+{
+    return m_itemListParent.size();
+}
+
+int EItem::getParentIndex(const EItemPtr& parentItem)
+{
+    const EItem* target = parentItem.get();
+    for (size_t i = 0; i < m_itemListParent.size(); ++i)
+    {
+        if (m_itemListParent[i] == target)
+        {
+            return static_cast<int>(i);
+        }
+    }
+    return -1; // node not found.
+}
+
+bool EItem::isParentOf(const EItemPtr& childItem) const
+{
+    const EItem* node = childItem.get();
     if (node == nullptr)
     {
         return false;
@@ -146,307 +298,37 @@ bool EItem::isAncestorOf(const EItem* node) const
     return false;
 }
 
-bool EItem::d_addChild(EItem* child)
+bool EItem::isChildOf(const EItemPtr& parentItem) const
 {
-    if (child == nullptr)
+    const EItem* target = parentItem.get();
+    if (target == nullptr)
     {
         return false;
     }
-    if (child == this || child->isAncestorOf(this))
+    std::vector<const EItem*> stack;
+    std::unordered_set<const EItem*> visited;
+    stack.push_back(this);
+    while (!stack.empty())
     {
-        ELOG_ERROR("EItem: cannot insert an ancestor (or self) as a child");
-        return false;
-    }
-    if (this->containsChild(child))
-    {
-        ELOG_ERROR("EItem: cannot add an ancestor (or self) as a child");
-        return false;
-    }
-    if (this->containsChild(child))
-    {
-        ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\",ignoring call",
-                child->getName().data(), this->getName().data());
-        return false;
-    }
-    m_itemListChild.push_back(child);
-    child->m_itemListParent.push_back(this);
-    return true;
-}
-
-bool EItem::insertChild(int index, EItem* child )
-{
-    if (child == nullptr)
-        return false;
-    return d_insertChild(index, child);
-}
-
-bool EItem::d_insertChild(int index, EItem* child)
-{
-    if (child == nullptr)
-    {
-        return false;
-    }
-    if (child == this || child->isAncestorOf(this))
-    {
-        ELOG_ERROR("EItem: cannot insert an ancestor (or self) as a child");
-        return false;
-    }
-    if (this->containsChild(child))
-    {
-        ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\",ignoring call",
-                child->getName().data(), this->getName().data());
-        return false;
-    }
-
-    EItemList& _children = m_itemListChild;
-
-    if (index >= (int)_children.size())
-    {
-        index = (int)_children.size();      // set correct index value to be passed to the "childInserted" method
-        _children.push_back(child);
-    }
-    else
-    {
-        if (index < 0)
+        const EItem* current = stack.back();
+        stack.pop_back();
+        if (!visited.insert(current).second)
         {
-            index = 0;
+            continue;
         }
-        _children.insert(_children.begin()+index, child);
-    }
-
-    // register as parent of child.
-    // child->m_itemListParent.push_back(shared_from_this());
-    child->m_itemListParent.push_back(this);
-    return true;
-}
-
-EItem* EItem::getChild(int index)
-{
-    EItem* result = nullptr;
-    if(index >=0 && index < m_itemListChild.size())
-    {
-        result = m_itemListChild[index].get();
-
-    }
-    return result;
-}
-
-EItem* EItem::getChildByTypeName(const EString& typeName)
-{
-    EItem* result = nullptr;
-    for(int i = 0 ; i < this->m_itemListChild.size(); i++)
-    {
-        EString className = this->m_itemListChild[i]->getOrCreatMeta()->getClassName();
-        if(typeName == className)
+        for (EItem* parent : current->m_itemListParent)
         {
-            result = this->m_itemListChild[i].get();
-            break;
+            if (parent == target)
+            {
+                return true;
+            }
+            if (parent != nullptr)
+            {
+                stack.push_back(parent);
+            }
         }
-    }
-
-    return result;
-}
-
-EItem* EItem::parent() const
-{
-    return m_itemListParent.empty() ? nullptr : m_itemListParent.front();
-}
-
-int EItem::row() const
-{
-    EItem* p = parent();
-    return p ? p->getChildIndex(const_cast<EItem*>(this)) : -1;
-}
-
-EItem* EItem::getParent(int index)
-{
-    // EItemPtr result = nullptr;
-    EItem* result = NULL;
-    if(index >=0 && index < m_itemListParent.size())
-    {
-        result = m_itemListParent[index];
-        // result = EItemPtr(m_itemListParent[index]);
-    }
-    return result;
-}
-
-int EItem::getChildIndex(EItem* childPtr)
-{
-    EItemList& _children = m_itemListChild;
-    for (unsigned int childNum=0;childNum<_children.size();++childNum)
-    {
-        if (_children[childNum] == childPtr) 
-        {
-            return childNum;
-        }
-    }
-    return -1; // node not found.
-}
-
-int EItem::getParentIndex(EItem* parentPtr)
-{
-    // std::vector<EItemPtr>& _parents = m_itemListParent;
-    std::vector<EItem*>& _parents = m_itemListParent;
-    for (unsigned int num=0; num<_parents.size();++num)
-    {
-        if (_parents[num] == parentPtr) 
-        {
-            return num;
-        }
-    }
-    return -1; // node not found.
-}
-
-size_t EItem::getParentCount()
-{
-    return m_itemListParent.size();
-}
-
-
-size_t EItem::getChildCount()
-{
-    return m_itemListChild.size();
-}
-
-bool EItem::containsChild( const EItem* child )
-{
-    EItemList& _children = m_itemListChild;
-
-    for (EItemList::const_iterator itr=_children.begin();
-            itr!=_children.end();
-            ++itr)
-    {
-        if (*itr == child) 
-            return true;
     }
     return false;
-}
-
-bool EItem::removeChild(int index, int numChildrenToRemove)
-{
-    return d_removeChild(index, numChildrenToRemove);
-}
-
-bool EItem::attachChild(EItem* child)
-{
-    return d_attachChild(static_cast<int>(m_itemListChild.size()), child);
-}
-
-bool EItem::d_attachChild(int index, EItem* child)
-{
-    if (child == nullptr)
-    {
-        return false;
-    }
-    if (this->containsChild(child))
-    {
-        ELOG_ERROR("Item \"%s\" is already a child of Item \"%s\",ignoring call",
-                child->getName().data(), this->getName().data());
-        return false;
-    }
-
-    EItemList& _children = m_itemListChild;
-    if (index >= (int)_children.size())
-    {
-        index = (int)_children.size();
-        _children.push_back(child);
-    }
-    else
-    {
-        if (index < 0)
-        {
-            index = 0;
-        }
-        _children.insert(_children.begin() + index, child);
-    }
-    child->m_itemListParent.push_back(this);
-    return true;
-}
-
-bool EItem::d_removeChild(int index, int numChildrenToRemove)
-{
-    if(index < 0 || index >= (int)m_itemListChild.size())
-    {
-        return false;
-    }
-    int endOfRemoveRange = index + numChildrenToRemove;
-    if (endOfRemoveRange > (int)m_itemListChild.size())
-    {
-        endOfRemoveRange = (int)m_itemListChild.size();
-    }
-
-    //remove parent ptr in child item
-    for(int i = index; i < endOfRemoveRange; i++)
-    {
-        EItemPtr child = m_itemListChild[i];
-        //child->removeParent(shared_from_this());
-        child->removeParent(this);
-    }
-
-    m_itemListChild.erase(m_itemListChild.begin()+index, m_itemListChild.begin()+endOfRemoveRange);
-    return true;
-}
-
-bool EItem::removeParent(int index, int numParentToRemove)
-{
-    if (index < 0 || numParentToRemove <= 0 ||
-        index >= static_cast<int>(m_itemListParent.size()))
-    {
-        return false;
-    }
-    int endOfRemoveRange = index + numParentToRemove;
-    if (endOfRemoveRange > static_cast<int>(m_itemListParent.size()))
-    {
-        endOfRemoveRange = static_cast<int>(m_itemListParent.size());
-    }
-    m_itemListParent.erase(m_itemListParent.begin() + index,
-                           m_itemListParent.begin() + endOfRemoveRange);
-    return true;
-}
-
-bool EItem::removeChild(EItem* childPtr)
-{
-    EItemList& _children = m_itemListChild;
-    int pos = getChildIndex(childPtr);
-    if (pos >= 0 && pos<_children.size())
-        return removeChild(pos,1);
-    else 
-        return false;
-}
-
-bool EItem::removeParent(EItem* parentPtr)
-{
-    // std::vector<EItemPtr>& _parents = m_itemListParent;
-    std::vector<EItem*>& _parents = m_itemListParent;
-    int pos = getParentIndex(parentPtr);
-    if (pos >= 0 && pos<_parents.size())
-        return removeParent(pos,1);
-    else 
-        return false;
-}
-
-bool EItem::removeChildrenAll()
-{
-    if (m_itemListChild.empty())
-    {
-        return false;
-    }
-    d_clearChildren();
-    return true;
-}
-
-void EItem::d_clearChildren()
-{
-    if (m_itemListChild.empty())
-    {
-        return;
-    }
-    // 独立实现(不走 removeChild,避免重复事件): 仅移除父引用 + 清空
-    for (size_t i = 0; i < m_itemListChild.size(); i++)
-    {
-        m_itemListChild[i]->removeParent(this);
-    }
-    m_itemListChild.clear();
 }
 
 void EItem::setAttached(intptr_t ptr)
@@ -459,17 +341,7 @@ intptr_t EItem::getAttached()
     return m_attached;
 }
 
-void EItem::setIfHandledInTree(bool value)
-{
-    this->m_ifHandledInTree = value;
-}
-
-bool EItem::getIfHandledInTree()
-{
-    return this->m_ifHandledInTree;
-}
-
-EItemMeta* EItem::getOrCreatMeta()
+EItemMetaPtr EItem::getOrCreatMeta()
 {
     if(m_itemMeta == nullptr)
     {
@@ -484,7 +356,7 @@ EItemMeta* EItem::getOrCreatMeta()
         }
     }
 
-    return m_itemMeta.get();
+    return m_itemMeta;
 }
 
 EItemMetaPtr EItem::getMeta() const
@@ -513,74 +385,3 @@ EString EItem::getStrForDebug()
 
     return str;
 }
-
-void EItem::setPropertyIfShowUI(const EString& propName , bool value)
-{
-    EItemMetaPropertyPtr prop = this->getOrCreatMeta()->getProperty(propName);
-    if(prop == nullptr){
-        ELOG_INFO("prop is nullptr");
-        return;
-    }
-    prop->ifShowUI = value;
-}
-
-void EItem::setPropertyIfSyncUIEveryFrame(const EString& propName, bool value)
-{
-    EItemMetaPropertyPtr prop = this->getOrCreatMeta()->getProperty(propName);
-    if(prop == nullptr){
-        return;
-    }
-    prop->ifSyncUIEveryFrame = value;
-}
-
-void EItem::setPropertyIconName(const EString& iconName)
-{
-    this->getOrCreatMeta()->addProperty("iconName", iconName);
-}
-
-EString EItem::getPropertyIconName()
-{
-    // 注:meta 在子类构造函数(autogen construct)中已创建,getOrCreatMeta 直接返回
-    // 已有指针,无创建开销(实测与 getMeta 无差异;保持原实现)
-    EItemMetaPropertyPtr prop = this->getOrCreatMeta()->getProperty("iconName");
-    if(prop == nullptr)
-    {
-        return "";
-    }
-    return prop->value.to_EString();
-}
-// EString EItem::toTreeItemName(const EString& name)
-// {
-    // EString result;
-    // if(name == "osg::Group")
-    // {
-        // result = "Group";
-    // }
-    // else if(name == "osg::Node")
-    // {
-        // result = "Node";
-    // }
-    // else if(name == "osg::MatrixTransform")
-    // {
-        // result = "MT";
-    // }
-    // else if(name == "osg::Geode")
-    // {
-        // result = "Geod";
-    // }
-    // else if(name == "osg::Geometry")
-    // {
-        // result = "Geom";
-    // }
-    // else if(name == "osgAnimation::Bone")
-    // {
-        // result = "Bone";
-    // }
-    // else
-    // {
-        // result = name;
-    // }
-    // return result;
-// }
-
-

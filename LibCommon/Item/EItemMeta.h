@@ -7,7 +7,7 @@
 #include <Variant/EString.h>
 #include "SmartPtr/ESmartPtr.h"
 #include <DefineLibCommon.h>
-#include <DefineCommon.h>
+#include <ECommonDefines.h>
 
 #include <Item/EItemMetaProperty.h>
 #include <Item/EItemMetaFunction.h>

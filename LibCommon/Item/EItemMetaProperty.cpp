@@ -18,8 +18,7 @@ uint64_t EItemMetaProperty::getMatrixChangeSeq()
 //TODO: if m_funSetProperty==null, then the owner's value will not be set, how to handle this problem?
 void EItemMetaProperty::setPropertyValue(const EVariant& value)
 {
-    // 仅设置属性值(写 meta 缓存 + autogen setter 写成员); 不通知 model。
-    // 需要通知的调用方(UI 面板/RPC/Lua/undo 恢复)使用 setPropertyValueAndNotify。
+    // 仅设置属性值(写 meta 缓存并调用 setter), 不触发通知。
     this->value = value;
     if(this->m_funSetProperty != NULL)
     {

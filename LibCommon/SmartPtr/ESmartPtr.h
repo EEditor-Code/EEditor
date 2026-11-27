@@ -5,6 +5,7 @@
 #define SMART_PTR_H
 #include <DefineLibCommon.h>
 #include <type_traits>
+#include <atomic>
 
 class COMMON_DLL Referenced 
 {
@@ -32,7 +33,7 @@ protected:
     virtual ~Referenced();
 
 private:
-    mutable int _refCount; // Reference count, mutable allows modification in const member functions
+    mutable std::atomic<int> _refCount; // Atomic reference count; mutable allows modification in const member functions
 };
 
 template <typename T>

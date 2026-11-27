@@ -141,7 +141,7 @@ EEditor-open/
 ├─ docs/images/                # README 配图
 └─ LibCommon/                  # 最小内核层（C++17，无 Qt/OSG 依赖）
    ├─ CMakeLists.txt
-   ├─ DefineCommon.h           # 公共宏与依赖聚合
+   ├─ ECommonDefines.h         # 公共宏与依赖聚合
    ├─ DefineLibCommon.h        # 导出宏
    ├─ Item/                    # 对象模型与元信息
    │  ├─ EItem.*               # 对象树基类
@@ -333,7 +333,7 @@ EEditor-open/
 ├─ docs/images/                # README images
 └─ LibCommon/                  # minimal kernel (C++17, no Qt/OSG dependency)
    ├─ CMakeLists.txt
-   ├─ DefineCommon.h           # shared macros and dependency aggregation
+   ├─ ECommonDefines.h         # shared macros and dependency aggregation
    ├─ DefineLibCommon.h        # export macros
    ├─ Item/                    # object model and metadata
    │  ├─ EItem.*               # object-tree base class
